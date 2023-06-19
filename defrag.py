@@ -1,6 +1,6 @@
 import scapy.all as scapy
 
-def defragment_tcp_packets(pcap_file):
+def defrag_tcp_packets(pcap_file):
     packets = scapy.rdpcap(pcap_file)
     fragments = {}
 
