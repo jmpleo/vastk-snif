@@ -2,3 +2,4 @@ venv
 sniffer/__pycache__
 sniffer/networking/__pycache__
 sniffer/capture.pcap
+__pycache__
