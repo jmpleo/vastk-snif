@@ -1,10 +1,21 @@
 import argparse
-from scapy.all import rdpcap, gzip
+
+from scapy.all import gzip, rdpcap
 from scapy.layers.inet import TCP
 
-parser = argparse.ArgumentParser(description='Restore HTML payload from TCP packets')
-parser.add_argument('input_file', metavar='INPUT_FILE', help='input PCAP file')
-parser.add_argument('output_files_prefix', metavar='OUTPUT_FILES_PREFIX', help='output HTML file')
+parser = argparse.ArgumentParser(
+    description='Restore HTML payload from TCP packets'
+)
+parser.add_argument(
+    'input_file',
+    metavar='INPUT_FILE',
+    help='input PCAP file'
+)
+parser.add_argument(
+    'output_files_prefix',
+    metavar='OUTPUT_FILES_PREFIX',
+    help='output HTML file'
+)
 
 args = parser.parse_args()
 
@@ -23,7 +34,10 @@ for packet in packets:
         if content_encoding == 'gzip':
             s_str = gzip.decompress(raw[raw.index(b'\r\n\r\n')+4:]).decode('utf-8')
         else:
-            s_str = raw.decode('utf-8')
+            try:
+                s_str = raw.decode('utf-8')
+            except:
+                s_str = ''
         count += 1
         payload += s_str
         with open(f"{args.output_files_prefix}-{count}.html", 'w') as f:
