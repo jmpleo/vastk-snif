@@ -6,3 +6,5 @@ __pycache__
 out
 test
 sniffer/tm.ipynb
+debug.ipynb
+.ipynb_checkpoints/
