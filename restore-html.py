@@ -55,12 +55,17 @@ parser.add_argument(
     metavar='INPUT_FILE',
     help='input PCAP file'
 )
+parser.add_argument(
+    'output_prefix',
+    metavar='OUTPUT_PREFIX',
+    help='prefix for ouput files'
+)
 args = parser.parse_args()
 packets = rdpcap(args.input_file)[TCP]
 
 contents = get_http_content(get_tcp_session(packets))
 
 for session in contents:
-    with open(f"{session[0]}-{session[1]}.html", "w", encoding="utf-8") as f:
+    with open(f"{args.output_prefix}{session[0]}-{session[1]}.html", "w", encoding="utf-8") as f:
         f.write(contents[session])
 
