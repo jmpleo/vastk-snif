@@ -4,3 +4,5 @@ sniffer/networking/__pycache__
 sniffer/capture.pcap
 __pycache__
 out
+test
+sniffer/tm.ipynb

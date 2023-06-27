@@ -26,6 +26,6 @@ sudo python sniffer.py # capture in ./capture.pcap
 #### 2. Restore pages:
 
 ```bash
-python restore_pages.py sniffer/capture.pcap [output prefix to files]
+python restore_pages.py sniffer/capture.pcap [output prefix to files, ex: out/out]
 ```
 
