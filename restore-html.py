@@ -5,9 +5,10 @@ import gzip
 import zlib
 import brotli
 from bs4 import BeautifulSoup
-
+import itertools
 import argparse
 import re
+
 
 def get_tcp_session(packets):
     sessions = {}
@@ -15,64 +16,82 @@ def get_tcp_session(packets):
     for packet in packets:
         if TCP in packet and packet[TCP].payload:
             session = (packet[TCP].sport, packet[TCP].dport)
-            sessions[session] = re.sub(
-                b'(\r\n\r\n)+', b'\r\n\r\n',
-                sessions.get(session, b'') + b'\r\n\r\n' + packet[TCP].payload.load)            
+            sessions[session] = sessions.get(session, b'') + packet[TCP].payload.load            
 
     return sessions
 
-def get_http_content(sessions):
-    contents = {}
 
-    for session, payload in sessions.items():
-        while b'\r\n\r\n' in payload:
-            
-            header, payload = payload.split(b'\r\n\r\n', 1)
-            
-            # if b'HTTP' not in header: # and len(payload) and b'HTTP' in payload[:50]:
-            #     continue
+def get_http_response(sessions):
+    return {
+        session : payload
+        for session, payload in sessions.items() if session[0] == 80
+    }
 
-            # print(f"header: {header}\npayload: {payload[:100]}\nsession: {session}")
-            # input()
-            
-            # if b'\r\n\r\n' in payload:
-            #     body, payload = payload.split(b'\r\n\r\n', 1)
-            # else:
-            #     body = payload
-            
+
+def choise_bytes_delim(s):
+    delim_len = 1
+    while True:
+        for delim in generate_bytes_string(delim_len):
+            if delim not in s:
+                return delim
+        delim_len += 1
+
+        
+def generate_bytes_string(length):
+    for s in itertools.product(range(256), repeat=length):
+        yield bytes(s)
+
+
+def split_on_http_mess(http_responses):
+    splited = {}
+    for session, http_response in http_responses.items():
+        delim = choise_bytes_delim(http_response) 
+        splited[session] = re.sub(
+            b'(?P<http>HTTP\/\d\.\d\s+\d+\s+[\w\s-]+\r\n(?:[\w-]+:\s+.*\r\n)*\r\n)', 
+            delim + b'\g<http>',
+            http_response
+        ).split(delim)[1:]
+    return splited
+
+
+def try_decompres_http_content(splited_http_messeges):
+    decompressed_http_content = {}
+    for session, http_messeges in splited_http_messeges.items():    
+        decompressed_http_content[session] = []
+        for http_mess in http_messeges: 
+            header, body = http_mess.split(b'\r\n\r\n', 1)
             enc_match = re.search(b'Content-Encoding: ([^\r\n]*)', header)
-
             # print(f"header: {header}\nbody: {body}\nsession: {session}")
             # input()
             if enc_match:
                 encoding = enc_match.group(1).decode('utf-8')
-                # print(f"encoding: {encoding}")
-                # input()
                 try:
                     if encoding == 'gzip':
-                        contents[session] = contents.get(session, '') + gzip.decompress(payload).decode('utf-8')
+                        decompressed_http_content[session].append(gzip.decompress(body))
+                        #decompressed_http_content[session] = { header : gzip.decompress(body) }
                     elif encoding == 'deflate':
-                        contents[session] = contents.get(session, '') + zlib.decompress(payload).decode('utf-8')
+                        decompressed_http_content[session].append(zlib.decompress(body))
+                        #decompressed_http_content[session] = { header : zlib.decompress(body) }
                     elif encoding == 'br':
-                        contents[session] = contents.get(session, '') + brotli.decompress(payload).decode('utf-8')
+                        decompressed_http_content[session].append(brotli.decompress(body))
+                        #decompressed_http_content[session] = { header : brotli.decompress(body) }
                     else:
-                        contents[session] = contents.get(session, '') + payload.decode('utf-8')
+                        decompressed_http_content[session].append(gzip.decompress(body))
+                        #decompressed_http_content[session] = { header : gzip.decompress(body) }
                 except Exception as e:
-                    continue
-            else:
-                try:
-                    contents[session] = contents.get(session, '') + payload.decode('utf-8')
-                except Exception as e:
-                    continue
+                    print(encoding)
+                    decompressed_http_content[session].append(body)
+                    #decompressed_http_content[session] = { header : body }
+    return decompressed_http_content
+                
 
-    return contents
-
-def save_content(contents):
-    for session, content in contents.items():
-        soup = BeautifulSoup(content)
-        filename = f"{soup.title.string}.html" if soup.title else f"session_{session[0]}-{session[1]}.out"
-        with open(f"{filename}", "w") as f:
-            f.write(content)
+def save_content(contents, output_dir):
+    for session, contents in contents.items():
+        for i, content in enumerate(contents):
+            soup = BeautifulSoup(content)
+            filename = f"{soup.title.string}.html" if soup.title else f"session_{session[0]}-{session[1]}-{i}.out"
+            with open(f"{output_dir}/{filename}", "w") as f:
+                f.write(content.decode('utf-8'))
 
 parser = argparse.ArgumentParser(
     description='Restore HTML payload from TCP packets'
@@ -83,18 +102,17 @@ parser.add_argument(
     help='input PCAP file'
 )
 parser.add_argument(
-    'output_prefix',
-    metavar='OUTPUT_PREFIX',
-    help='prefix for ouput files'
+    'report_dir',
+    metavar='REPORT',
+    help='report directory for output files'
 )
 args = parser.parse_args()
 packets = rdpcap(args.input_file)[TCP]
 
-contents = get_html_content(get_http_content(get_tcp_session(packets)))
-
-for session, content in contents.items():
-    soup = BeautifulSoup(content)
-    filename = f"{soup.title.string}.html" if soup.title else f"session_{session[0]}-{session[1]}.out"
-    with open(f"{args.output_prefix}{filename}", "w", encoding="utf-8") as f:
-        f.write(content)
-
+save_content(
+    try_decompres_http_content(
+    split_on_http_mess(
+    get_http_response(
+    get_tcp_session(packets)))),
+    args.report_dir
+)
