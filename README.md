@@ -14,7 +14,6 @@ sudo python sniffer.py # capture in ./capture.pcap
 #### 2. Restore pages:
 
 ```bash
-python restore-html.py sniffer/capture.pcap [output prefix to files, ex: out/
-for dir]
+python restore-html.py test.pcap report
 ```
 
