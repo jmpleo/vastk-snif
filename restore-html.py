@@ -16,7 +16,7 @@ def get_tcp_session(packets):
     for packet in packets:
         if TCP in packet and packet[TCP].payload:
             session = (packet[TCP].sport, packet[TCP].dport)
-            sessions[session] = sessions.get(session, b'') + packet[TCP].payload.load            
+            sessions[session] = sessions.get(session, b'') + packet[TCP].payload.load
 
     return sessions
 
@@ -36,7 +36,7 @@ def choise_bytes_delim(s):
                 return delim
         delim_len += 1
 
-        
+
 def generate_bytes_string(length):
     for s in itertools.product(range(256), repeat=length):
         yield bytes(s)
@@ -45,9 +45,9 @@ def generate_bytes_string(length):
 def split_on_http_mess(http_responses):
     splited = {}
     for session, http_response in http_responses.items():
-        delim = choise_bytes_delim(http_response) 
+        delim = choise_bytes_delim(http_response)
         splited[session] = re.sub(
-            b'(?P<http>HTTP\/\d\.\d\s+\d+\s+[\w\s-]+\r\n(?:[\w-]+:\s+.*\r\n)*\r\n)', 
+            b'(?P<http>HTTP\/\d\.\d\s+\d+\s+[\w\s-]+\r\n(?:[\w-]+:\s+.*\r\n)*\r\n)',
             delim + b'\g<http>',
             http_response
         ).split(delim)[1:]
@@ -56,9 +56,9 @@ def split_on_http_mess(http_responses):
 
 def try_decompres_http_content(splited_http_messeges):
     decompressed_http_content = {}
-    for session, http_messeges in splited_http_messeges.items():    
+    for session, http_messeges in splited_http_messeges.items():
         decompressed_http_content[session] = []
-        for http_mess in http_messeges: 
+        for http_mess in http_messeges:
             header, body = http_mess.split(b'\r\n\r\n', 1)
             enc_match = re.search(b'Content-Encoding: ([^\r\n]*)', header)
             # print(f"header: {header}\nbody: {body}\nsession: {session}")
@@ -83,12 +83,12 @@ def try_decompres_http_content(splited_http_messeges):
                     decompressed_http_content[session].append(body)
                     #decompressed_http_content[session] = { header : body }
     return decompressed_http_content
-                
+
 
 def save_content(contents, output_dir):
     for session, contents in contents.items():
         for i, content in enumerate(contents):
-            soup = BeautifulSoup(content)
+            soup = BeautifulSoup(content, 'html.parser')
             filename = f"{soup.title.string}.html" if soup.title else f"session_{session[0]}-{session[1]}-{i}.out"
             with open(f"{output_dir}/{filename}", "w") as f:
                 f.write(content.decode('utf-8'))
