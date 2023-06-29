@@ -1,6 +1,11 @@
-# VasTk Sniffer
-
 ### How to use?
+
+#### Python Requirements:
+
+``` 
+scapy==2.5.0
+beautifulsoup4==4.12.2
+```
 
 #### 1. Capture:
 
